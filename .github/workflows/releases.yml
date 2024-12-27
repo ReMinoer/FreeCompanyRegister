@@ -1,0 +1,14 @@
+name: Release
+on:
+  release:
+    types: [published]
+jobs:
+  dotnet-release:
+    name: dotnet
+    uses: ReMinoer/workflows/.github/workflows/dotnet-release.yml@master
+    with:
+      solution_file: FreeCompanyRegister.sln
+      project_folder: FreeCompanyRegister
+      target_framework: net9.0
+      zip_prefix: FreeCompanyRegister
+      dotnet_version: 9
