@@ -47,6 +47,8 @@ while (true)
     }
     else
     {
+        Console.WriteLine($"""Search "{freeCompanyQuery}"...""");
+
         FreeCompanySearchPage? freeCompanySearch = await client.SearchFreeCompany(new FreeCompanySearchQuery()
         {
             Name = freeCompanyQuery,
@@ -145,7 +147,7 @@ await Parallel.ForEachAsync(membersInfos, async (memberInfo, _) =>
 });
 Console.WriteLine();
 
-string jobsFile = Path.Combine(Environment.CurrentDirectory, $"{freeCompanyName}.jobs.csv");
+string jobsFile = Path.Combine(Environment.CurrentDirectory, $"{freeCompanyName}.csv");
 Console.WriteLine($"""Write "{jobsFile}"...""");
 
 ClassJob[] jobs =
@@ -207,6 +209,10 @@ writer.Write(",");
 writer.Write("CharacterName");
 writer.Write(",");
 writer.Write("LastUpdate");
+writer.Write(",");
+writer.Write("FreeCompanyRank");
+writer.Write(",");
+writer.Write("GrandCompanyRank");
 foreach (ClassJob classJob in jobs)
 {
     writer.Write(",");
@@ -214,7 +220,7 @@ foreach (ClassJob classJob in jobs)
 }
 writer.WriteLine();
 
-// Write levels for each characters in CSV
+// Write info of each character in CSV
 
 foreach (Member member in members.OrderBy(x => x.Id))
 {
@@ -223,6 +229,10 @@ foreach (Member member in members.OrderBy(x => x.Id))
     writer.Write(member.MemberInfo.Name);
     writer.Write(",");
     writer.Write(dateTime.ToString("yyyy-MM-dd HH:mm:ss"));
+    writer.Write(",");
+    writer.Write(member.MemberInfo.FreeCompanyRank);
+    writer.Write(",");
+    writer.Write(member.MemberInfo.Rank);
     
     if (member.Jobs is not null)
     {
