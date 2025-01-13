@@ -13,4 +13,4 @@ jobs:
     with:
       solution_file: FreeCompanyRegister.sln
       pack: false
-      dotnet_version: 9
+      dotnet_version: 8

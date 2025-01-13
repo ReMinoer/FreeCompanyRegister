@@ -9,6 +9,6 @@ jobs:
     with:
       solution_file: FreeCompanyRegister.sln
       project_folder: FreeCompanyRegister
-      target_framework: net9.0
+      target_framework: net8.0
       zip_prefix: FreeCompanyRegister
-      dotnet_version: 9
+      dotnet_version: 8
