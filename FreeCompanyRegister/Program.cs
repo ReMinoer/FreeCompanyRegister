@@ -11,17 +11,42 @@ using NetStone.StaticData;
 FileVersionInfo version = FileVersionInfo.GetVersionInfo(Environment.GetCommandLineArgs()[0]);
 Console.WriteLine($"FreeCompanyRegister - v{version.ProductVersion}");
 
-using LodestoneClient client = await LodestoneClient.GetClientAsync();
+const string languageArg = "/language:";
+
+string? query = null;
+Language language = Language.eu;
+
+foreach (string arg in Environment.GetCommandLineArgs().Skip(1))
+{
+    if (arg.StartsWith(languageArg))
+    {
+        if (!Enum.TryParse(arg.Substring(languageArg.Length), out language))
+        {
+            Console.WriteLine($"Unknow language \"{arg}\". Choose one of those: {string.Join(", ", Enum.GetNames<Language>())}");
+        }
+    }
+    else if (query is null)
+    {
+        query = arg;
+    }
+}
+
+Console.WriteLine($"Lodestone language: {language}");
+
+using LodestoneClient client = await LodestoneClient.GetClientAsync(lodestoneBaseAddress: $"https://{language}.finalfantasyxiv.com");
 
 // Search free company by name or Lodestone ID
-string? freeCompanyQuery = Environment.GetCommandLineArgs().Skip(1).FirstOrDefault();
-bool hasCommandLineArguments = freeCompanyQuery is not null;
+string? freeCompanyQuery = query;
+bool hasCommandLineQuery = freeCompanyQuery is not null;
 
 string freeCompanyId;
 string freeCompanyName;
+string freeCompanyServer;
 while (true)
 {
-    if (string.IsNullOrEmpty(freeCompanyQuery))
+    Console.WriteLine();
+
+    if (string.IsNullOrEmpty(query))
     {
         do
         {
@@ -30,20 +55,21 @@ while (true)
         } while (string.IsNullOrWhiteSpace(freeCompanyQuery));
     }
 
-    freeCompanyQuery = freeCompanyQuery.Trim();
+    freeCompanyQuery = freeCompanyQuery?.Trim() ?? string.Empty;
     if (freeCompanyQuery.All(char.IsDigit))
     {
         LodestoneFreeCompany? freeCompany = await client.GetFreeCompany(freeCompanyQuery);
         if (freeCompany is null)
         {
             Console.WriteLine($"There is no free company matching the ID {freeCompanyQuery}.");
-            if (hasCommandLineArguments)
+            if (hasCommandLineQuery)
                 return;
             continue;
         }
         
         freeCompanyId = freeCompany.Id;
         freeCompanyName = freeCompany.Name;
+        freeCompanyServer = freeCompany.World;
     }
     else
     {
@@ -58,7 +84,7 @@ while (true)
         if (freeCompanySearch is null)
         {
             Console.WriteLine($"""Failed to search a free company with query "{freeCompanyQuery}".""");
-            if (hasCommandLineArguments)
+            if (hasCommandLineQuery)
                 return;
             continue;
         }
@@ -66,7 +92,7 @@ while (true)
         if (!freeCompanySearch.HasResults)
         {
             Console.WriteLine($"""No match for free company with query "{freeCompanyQuery}".""");
-            if (hasCommandLineArguments)
+            if (hasCommandLineQuery)
                 return;
             continue;
         }
@@ -92,17 +118,22 @@ while (true)
             string? selectedSearchResultId;
             do
             {
-                Console.Write("Enter the number: ");
+                Console.Write("Enter the number (0 to quit): ");
                 selectedSearchResultId = Console.ReadLine();
+
+                if (selectedSearchResultId == 0.ToString())
+                    return;
+
             } while (string.IsNullOrWhiteSpace(selectedSearchResultId)
                      || !int.TryParse(selectedSearchResultId.Trim(), out searchResultIndex)
-                     || searchResultIndex <= 0
+                     || searchResultIndex < 0
                      || searchResultIndex > resultCount);
         }
     
         var selectedFreeCompany = freeCompanySearch.Results.ElementAt(searchResultIndex - 1);
         freeCompanyId = selectedFreeCompany.Id!;
         freeCompanyName = selectedFreeCompany.Name;
+        freeCompanyServer = selectedFreeCompany.Server;
     }
 
     break;
@@ -115,12 +146,12 @@ List<FreeCompanyMembersEntry> membersInfos = new();
 do
 {
     var page = (membersRequest?.CurrentPage ?? 0) + 1;
-    Console.WriteLine($"""Get "{freeCompanyName}" members (page {page})...""");
+    Console.WriteLine($"""Get "{freeCompanyName}" ({freeCompanyServer}) members - Page {page}...""");
     
     membersRequest = await client.GetFreeCompanyMembers(freeCompanyId, page);
     if (membersRequest is null)
     {
-        Console.WriteLine($"""Failed to get {freeCompanyName}" members (page {page}).""");
+        Console.WriteLine($"""Failed to get {freeCompanyName}" ({freeCompanyServer}) members (page {page}).""");
         return;
     }
 
@@ -133,7 +164,7 @@ while (membersRequest.CurrentPage < membersRequest.NumPages);
 
 ConcurrentBag<Member> members = new();
 
-Console.Write($"Get members infos...");
+Console.Write("Get members infos...");
 await Parallel.ForEachAsync(membersInfos, async (memberInfo, _) =>
 {
     CharacterClassJob? jobInfos = await client.GetCharacterClassJob(memberInfo.Id);
@@ -150,8 +181,8 @@ Console.WriteLine();
 string jobsFile = Path.Combine(Environment.CurrentDirectory, $"{freeCompanyName}.csv");
 Console.WriteLine($"""Write "{jobsFile}"...""");
 
-ClassJob[] jobs =
-[
+ClassJob[] jobs = new ClassJob[]
+{
     // Tanks
     ClassJob.Paladin,
     ClassJob.Warrior,
@@ -198,7 +229,7 @@ ClassJob[] jobs =
     ClassJob.Miner,
     ClassJob.Botanist,
     ClassJob.Fisher
-];
+};
 
 // Write CSV header
 
@@ -258,4 +289,11 @@ foreach (Member member in members.OrderBy(x => x.Id))
     }
 }
 
+Console.WriteLine("Done");
+
 internal record Member(int Id, FreeCompanyMembersEntry MemberInfo, CharacterClassJob? Jobs);
+
+public enum Language
+{
+    jp, na, eu, fr, de
+}
